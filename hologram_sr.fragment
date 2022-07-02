@@ -1,15 +1,7 @@
-// __multiversion__
-//This file is purely here to let the code compile. It is used only for Hololens, which currently runs only on DX11 compatible devices
-
-#if __VERSION__ >= 300
-#define varying in
-out vec4 FragColor;
-#define gl_FragColor FragColor
-#endif
+// Shader otimizada por Mathews
 
 varying vec4 color;
-
-void main()
+void main ()
 {
-	gl_FragColor = color;
+  gl_FragColor = color;
 }
