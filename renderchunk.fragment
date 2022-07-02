@@ -1,0 +1,206 @@
+//Creeper'Shaders Pocket-Edition
+//Minecraft Pocket-Edition Shaders
+//by +Haoguang Liang
+//    Baidu Tieba @苦力怕creeper
+//    QQ:392278526
+
+//STOP STOP STOP STOP STOP STOP STOP STOP//
+
+//停下你手中的事请先阅读关于Shaders二次修改事项！
+//你可以二次修改Creeper Shaders的数据作为自己使用，不允许将修改后的Shaders发布到网络上或共享给他人！
+//你可以用它整合材质之后发布，或者使用它来制作整合包！但是你必须声明，你的 材质/整合包 整合了Creeper Shaders！
+//你可以转载它，但是必须注明作者，你不可以私自发布并且声称原创，更不可以用它来赚钱！
+
+//我们不支持所谓的借鉴，我们只知道什么叫公平。
+//我们从来不会把维权当成一个麻烦，当别人做错的时候。
+//我们有精力有资金去维护自身合法权利。
+
+//祝愉快！CSPE业余开发小组全体成员。
+
+// __multiversion__
+// This signals the loading code to prepend either #version 100 or #version 300 es as apropriate.
+
+// To use centroid sampling we need to have version 300 es shaders, which requires changing:
+// attribute to in
+// varying to out when in vertex shaders or in when in fragment shaders
+// defining an out vec4 FragColor and replacing uses of gl_FragColor with FragColor
+// texture2D to texture
+#if __VERSION__ >= 300
+
+// version 300 code
+
+#ifdef MSAA_FRAMEBUFFER_ENABLED
+#define _centroid centroid
+#else
+#define _centroid
+#endif
+
+#if defined(TEXEL_AA) && defined(TEXEL_AA_FEATURE)
+_centroid in highp vec2 uv0;
+_centroid in highp vec2 uv1;
+#else
+_centroid in vec2 uv0;
+_centroid in vec2 uv1;
+#endif
+
+#define varying in
+#define texture2D texture
+out vec4 FragColor;
+#define gl_FragColor FragColor
+
+#else
+
+// version 100 code
+varying vec2 uv0;
+varying vec2 uv1;
+
+#endif
+
+
+varying vec4 color;
+
+#ifdef FOG
+varying vec4 fogColor;
+#endif
+
+#ifdef NEAR_WATER
+varying float cameraDist;
+#endif
+
+#include "shaders/util.h"
+
+uniform sampler2D TEXTURE_0;
+uniform sampler2D TEXTURE_1;
+uniform sampler2D TEXTURE_2;
+uniform vec4 FOG_COLOR;
+
+void main()
+{
+#if !defined(TEXEL_AA) || !defined(TEXEL_AA_FEATURE)
+	vec4 diffuse = texture2D( TEXTURE_0, uv0 );
+	
+#else
+	vec4 diffuse = texture2D_AA(TEXTURE_0, uv0 );
+#endif
+
+vec4 textures = texture2D(TEXTURE_0,uv0);
+vec4 li = texture2D(TEXTURE_1,uv1);
+vec4 ab =FOG_COLOR;
+vec4 L_color = vec4(0.17,0.0,-0.1,1.5);
+vec4 sunlight_color = vec4(1.6,1.52,1.35,1.0)*0.7+vec4(ab.r,ab.g*0.8,ab.b*0.5,0.0);
+vec4 shadow_color = vec4(0.6,0.9,1.0,1.0);
+vec4 night_color =max(li,vec4(0.2,0.5,0.8,1.0));
+vec4 worldlight_color =sunlight_color*night_color;
+shadow_color*=night_color;
+
+vec4 light = texture2D(TEXTURE_1,vec2(1.0,uv1.y))+L_color* pow(uv1.x*1.5,4.0);
+
+vec2 tex_pos =		floor(vec2(uv0.x * 32.0, uv0.y * 16.0));
+
+float leaves_flag =0.0;
+
+	
+		#ifdef NEAR_WATER
+	
+	diffuse /= textures;
+	diffuse.rgb *=vec3(0.2,0.5,1.0);
+	
+	
+
+	#endif
+	
+
+	vec4 inColor = color;
+	
+
+	
+#ifdef SEASONS_FAR
+	diffuse.a = 1.0;
+	inColor.b = 1.0;
+#endif
+
+#ifdef ALPHA_TEST
+	#ifdef ALPHA_TO_COVERAGE
+		float alphaThreshold = .05;
+	#else
+		float alphaThreshold = .5;
+	#endif
+	if(diffuse.a < alphaThreshold)
+		discard;
+#endif
+	
+	diffuse = diffuse +L_color* pow(uv1.x*1.4,5.0);
+
+	 if( tex_pos.y == 5.0 &&(tex_pos.x>=24.0)||tex_pos.y ==6.0 &&(tex_pos.x<=2.0) ){//树叶
+   diffuse.rgb*=1.35;
+   leaves_flag=1.0;
+}
+  if(tex_pos.y==9.0 && (tex_pos.x==24.0||tex_pos.x==27.0||tex_pos.x==28.0||tex_pos.x==29.0||tex_pos.x==30.0||tex_pos.x==31.0)){
+  diffuse.rgb*=0.65;
+  }
+
+#ifndef SEASONS
+
+#if !defined(ALPHA_TEST) && !defined(BLEND)
+	diffuse.a = inColor.a;
+#elif defined(BLEND)
+	diffuse.a *= inColor.a;
+	#ifdef NEAR_WATER
+		float alphaFadeOut = clamp(cameraDist, 0.0, 1.0);
+		diffuse.a = mix(diffuse.a, 1.0, alphaFadeOut);
+	#endif
+#endif	
+	
+	diffuse.rgb *= inColor.rgb;
+#else
+	vec2 uv = inColor.xy;
+	diffuse.rgb *= mix(vec3(1.0,1.0,1.0), texture2D( TEXTURE_2, uv).rgb*2.0, inColor.b);
+	diffuse.rgb *= inColor.aaa;
+	diffuse.a = 1.0;
+#endif
+
+float x_shadow_flag =color.a;
+
+if(leaves_flag>=1.0){
+x_shadow_flag = color.g*1.4;
+}
+
+if(uv1.y<0.8761||x_shadow_flag<0.7){
+diffuse*=shadow_color+(sunlight_color-shadow_color)*uv1.x;
+}
+else{
+diffuse*=worldlight_color;
+}
+
+
+
+#ifdef FOG
+	diffuse.rgb = mix( diffuse.rgb, fogColor.rgb, fogColor.a );
+#endif
+
+	gl_FragColor = diffuse;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
